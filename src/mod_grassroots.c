@@ -98,6 +98,10 @@ static const char *SetGrassrootsUserAuthSystem (cmd_parms *cmd_p, void *cfg_p, c
 static const char *SetGrassrootsUserAuthClaimPrefix (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
 
 
+static const char *SetGrassrootsUserAuthEmailKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
+static const char *SetGrassrootsUserAuthNameKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
+static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
+
 
 static void *CreateServerConfig (apr_pool_t *pool_p, server_rec *server_p);
 
@@ -172,6 +176,9 @@ static const command_rec s_grassroots_directives [] =
 	AP_INIT_TAKE1 ("GrassrootsJobManagersPath", SetGrassrootsJobsManagerPath, NULL, ACCESS_CONF, "The path to the Grassroots Jobs Manager Module to use"),
 	AP_INIT_TAKE1 ("GrassrootsUserAuth", SetGrassrootsUserAuthSystem, NULL, ACCESS_CONF, "Set the user authentication system to use"),
 	AP_INIT_TAKE1 ("GrassrootsUserAuthClaim", SetGrassrootsUserAuthClaimPrefix, NULL, ACCESS_CONF, "Set the user claim prefix for querying the user details"),
+	AP_INIT_TAKE1 ("GrassrootsUserEmailKey", SetGrassrootsUserAuthEmailKey, NULL, ACCESS_CONF, "Set the user claim email key suffix for querying the user details"),
+	AP_INIT_TAKE1 ("GrassrootsUserNameKey", SetGrassrootsUserAuthNameKey, NULL, ACCESS_CONF, "Set the user claim name key suffix for querying the user details"),
+	AP_INIT_TAKE1 ("GrassrootsUserOrgKey", SetGrassrootsUserAuthOrgKey, NULL, ACCESS_CONF, "Set the user claim organization key suffix for querying the user details"),
 
 	{ NULL }
 };
@@ -331,6 +338,9 @@ static GrassrootsLocationConfig *CreateConfig (apr_pool_t *pool_p, server_rec *s
 							config_p -> glc_servers_path_s = NULL;
 							config_p -> glc_user_auth_system_s = NULL;
 							config_p -> glc_user_auth_claim_s = NULL;
+							config_p -> glc_user_auth_email_key_s = NULL;
+							config_p -> glc_user_auth_name_key_s = NULL;
+							config_p -> glc_user_auth_org_key_s = NULL;
 							config_p -> glc_servers_p = servers_p;
 							config_p -> glc_server_p = server_p;
 						}
@@ -418,19 +428,46 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 
 																											if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_claim_s, new_config_p -> glc_user_auth_claim_s, & (merged_config_p -> glc_user_auth_claim_s)))
 																												{
-																													apr_hash_t *merged_servers_p = apr_hash_overlay (pool_p, new_config_p -> glc_servers_p, base_config_p -> glc_servers_p);
 
-																													if (merged_servers_p)
+
+																													if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_email_key_s, new_config_p -> glc_user_auth_email_key_s, & (merged_config_p -> glc_user_auth_email_key_s)))
 																														{
-																															merged_config_p -> glc_servers_p = merged_servers_p;
-																															merged_config_p -> glc_server_p = new_config_p -> glc_server_p ? new_config_p -> glc_server_p : base_config_p -> glc_server_p;
+																															if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_name_key_s, new_config_p -> glc_user_auth_name_key_s, & (merged_config_p -> glc_user_auth_name_key_s)))
+																																{
+																																	if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_org_key_s, new_config_p -> glc_user_auth_org_key_s, & (merged_config_p -> glc_user_auth_org_key_s)))
+																																		{
+																																			apr_hash_t *merged_servers_p = apr_hash_overlay (pool_p, new_config_p -> glc_servers_p, base_config_p -> glc_servers_p);
 
-																															return merged_config_p;
-																														}
+																																			if (merged_servers_p)
+																																				{
+																																					merged_config_p -> glc_servers_p = merged_servers_p;
+																																					merged_config_p -> glc_server_p = new_config_p -> glc_server_p ? new_config_p -> glc_server_p : base_config_p -> glc_server_p;
+
+																																					return merged_config_p;
+																																				}
+																																			else
+																																				{
+																																					ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to create merged grassroots servers hash table");
+																																				}
+
+																																		}		/* if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_org_key_s, new_config_p -> glc_user_auth_org_key_s, & (merged_config_p -> glc_user_auth_org_key_s))) */
+																																	else
+																																		{
+																																			ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_user_auth_org_key_s from \"%s\" and \"%s\"", base_config_p -> glc_user_auth_org_key_s ? base_config_p -> glc_user_auth_org_key_s : "NULL", new_config_p -> glc_user_auth_org_key_s ? new_config_p -> glc_user_auth_org_key_s : "NULL");
+																																		}
+
+																																}		/* if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_name_key_s, new_config_p -> glc_user_auth_name_key_s, & (merged_config_p -> glc_user_auth_name_key_s))) */
+																															else
+																																{
+																																	ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_user_auth_name_key_s from \"%s\" and \"%s\"", base_config_p -> glc_user_auth_name_key_s ? base_config_p -> glc_user_auth_name_key_s : "NULL", new_config_p -> glc_user_auth_name_key_s ? new_config_p -> glc_user_auth_name_key_s : "NULL");
+																																}
+
+																														}		/* if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_email_key_s, new_config_p -> glc_user_auth_email_key_s, & (merged_config_p -> glc_user_auth_email_key_s))) */
 																													else
 																														{
-																															ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to create merged grassroots servers hash table");
+																															ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_user_auth_email_key_s from \"%s\" and \"%s\"", base_config_p -> glc_user_auth_email_key_s ? base_config_p -> glc_user_auth_email_key_s : "NULL", new_config_p -> glc_user_auth_email_key_s ? new_config_p -> glc_user_auth_email_key_s : "NULL");
 																														}
+
 
 																												}		/* if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_claim_s, new_config_p -> glc_user_auth_claim_s, & (merged_config_p -> glc_user_auth_claim_s))) */
 																											else
@@ -789,6 +826,29 @@ static const char *SetGrassrootsUserAuthClaimPrefix (cmd_parms *cmd_p, void *cfg
 
 
 
+static const char *SetGrassrootsUserAuthEmailKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s)
+{
+	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
+
+	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_user_auth_email_key_s), arg_s, config_p);
+}
+
+static const char *SetGrassrootsUserAuthNameKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s)
+{
+	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
+
+	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_user_auth_name_key_s), arg_s, config_p);
+}
+
+
+static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s)
+{
+	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
+
+	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_user_auth_org_key_s), arg_s, config_p);
+}
+
+
 static apr_status_t CleanUpTasks (void *value_p)
 {
 	apr_status_t status = CloseAllAsyncTasks () ? APR_SUCCESS : APR_EGENERAL;
@@ -931,9 +991,13 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 
 	if (req_p -> headers_in)
 		{
-			const char *name_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, "name");
-			const char *org_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, "organization");
-			const char *email_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, "email");
+			const char *email_key_s = (config_p -> glc_user_auth_email_key_s) ? (config_p -> glc_user_auth_email_key_s) : "Email";
+			const char *name_key_s = (config_p -> glc_user_auth_name_key_s) ? (config_p -> glc_user_auth_name_key_s) : "Name";
+			const char *org_key_s = (config_p -> glc_user_auth_org_key_s) ? (config_p -> glc_user_auth_org_key_s) : "Organization";
+
+			const char *email_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, email_key_s);
+			const char *name_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, name_key_s);
+			const char *org_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, org_key_s);
 			const char *forename_s = NULL;
 			const char *surname_s = NULL;
 

@@ -181,6 +181,15 @@ typedef struct
 	 */
 	char *glc_user_auth_claim_s;
 
+
+
+	char *glc_user_auth_email_key_s;
+
+	char *glc_user_auth_name_key_s;
+
+	char *glc_user_auth_org_key_s;
+
+
 } GrassrootsLocationConfig;
 
 
