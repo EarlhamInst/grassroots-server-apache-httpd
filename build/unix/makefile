@@ -154,7 +154,7 @@ conf:
 	if [ ! -e $(DIR_CONF)/grassroots.conf ]; then \
 		cat $(MODULE_LOAD_FILE) > $(DIR_CONF)/grassroots.conf; \
 		cat $(DIR_CONF)/httpd-grassroots.conf >> $(DIR_CONF)/conf/grassroots.conf; \
-		sed -i "s/DIR_GRASSROOTS_INSTALL/$(ESCAPED_DIR_GRASSROOTS_INSTALL)/g" $(DIR_CONF)/grassroots.conf; \
+		sed -i "s/DIR_GRASSROOTS/$(ESCAPED_DIR_GRASSROOTS_INSTALL)/g" $(DIR_CONF)/grassroots.conf; \
 	fi
 	
 
