@@ -148,7 +148,7 @@ file that is part of the httpd distribution and is normally located at `bin/envv
 # Begin Grassroots
 
 # Set the Grassroots installation path
-GRASSROOTS_PATH=/opt/grassroots-0/grassroots
+GRASSROOTS_PATH=/opt/grassroots
 
 # Add all of the paths for the dependencies
 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$GRASSROOTS_PATH/lib"
