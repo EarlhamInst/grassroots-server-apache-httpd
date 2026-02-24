@@ -55,7 +55,7 @@
 #include "unistd.h"
 
 #ifdef _DEBUG
-	#define MOD_GRASSROOTS_DEBUG	(STM_LEVEL_FINE)
+	#define MOD_GRASSROOTS_DEBUG	(STM_LEVEL_INFO)
 #else
 	#define MOD_GRASSROOTS_DEBUG	(STM_LEVEL_NONE)
 #endif
@@ -1309,8 +1309,11 @@ static GrassrootsServer *GetOrCreateNamedGrassrootsServer (const char * const lo
 
   						apr_pool_cleanup_register (pool_p, grassroots_p, CleanUpGrassrootServer, apr_pool_cleanup_null);
 
-							ap_log_error (APLOG_MARK, APLOG_INFO, APR_SUCCESS, NULL, "AllocateGrassrootsServer succeeded for \"%s\"", location_s);
-							PrintConfigToLog (location_s, config_p);
+  						if (MOD_GRASSROOTS_DEBUG >= STM_LEVEL_FINER)
+  							{
+									ap_log_error (APLOG_MARK, APLOG_INFO, APR_SUCCESS, NULL, "AllocateGrassrootsServer succeeded for \"%s\"", location_s);
+									PrintConfigToLog (location_s, config_p);
+  							}
 
   					}
 					else
