@@ -1123,28 +1123,6 @@ static int GrassrootsHandler (request_rec *req_p)
 
 							if (grassroots_p)
 								{
-									if (config_p -> glc_user_auth_system_s)
-										{
-											uint32 i = 0;
-											UserAuthSystem *auth_p = s_user_auth_systems_p;
-
-											for (i = 0; i < NUM_AUTH_SYSTEMS; ++ i, ++ auth_p)
-												{
-													if (Stricmp (auth_p -> uas_name_s, config_p -> glc_user_auth_system_s) == 0)
-														{
-															user_p = auth_p -> uas_get_user_fn (req_p, config_p, grassroots_p);
-
-															if (!user_p)
-																{
-																	PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get user");
-																}
-
-															/* force exit from loop */
-															i = NUM_AUTH_SYSTEMS;
-														}
-												}
-
-										}
 									json_req_p = GetRequestBodyAsJSON (req_p);
 								}
   					}
@@ -1172,6 +1150,29 @@ static int GrassrootsHandler (request_rec *req_p)
 						{
 							const char *error_s = NULL;
 							json_t *res_p = NULL;
+
+							if (config_p -> glc_user_auth_system_s)
+								{
+									uint32 i = 0;
+									UserAuthSystem *auth_p = s_user_auth_systems_p;
+
+									for (i = 0; i < NUM_AUTH_SYSTEMS; ++ i, ++ auth_p)
+										{
+											if (Stricmp (auth_p -> uas_name_s, config_p -> glc_user_auth_system_s) == 0)
+												{
+													user_p = auth_p -> uas_get_user_fn (req_p, config_p, grassroots_p);
+
+													if (!user_p)
+														{
+															PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get user");
+														}
+
+													/* force exit from loop */
+													i = NUM_AUTH_SYSTEMS;
+												}
+										}
+
+								}
 
 							res_p = ProcessServerJSONMessage (grassroots_p, json_req_p, user_p, &error_s);
 
