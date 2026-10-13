@@ -60,8 +60,15 @@ void DeallocateApacheOutputStream (OutputStream *stream_p)
 static int PrintToApacheStream (OutputStream *stream_p, const uint32 level, const char * const filename_s, const int line_number, const char *message_s, va_list args)
 {
 	ApacheOutputStream *apache_stream_p = (ApacheOutputStream *) stream_p;
-	char *value_s = apr_pvsprintf (apache_stream_p -> aos_server_p -> process -> pool, message_s, args);
+	/*
+	 * Don't allocate from the process pool as it is never cleared so
+	 * every message would leak. ap_log_error truncates to MAX_STRING_LEN
+	 * anyway so a buffer of that size is enough.
+	 */
+	char value_s [MAX_STRING_LEN];
 	int ap_level;
+
+	apr_vsnprintf (value_s, sizeof (value_s), message_s, args);
 
 	/* filenames and line numbers are only printed if APLOG_DEBUG is set, so use this all of the time */
 	switch (level)

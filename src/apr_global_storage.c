@@ -136,6 +136,7 @@ bool InitAPRGlobalStorage (APRGlobalStorage *storage_p, apr_pool_t *pool_p, apr_
 											}
 
 									FreeSharedMemory (storage_p -> ags_mapped_mem_p);
+									storage_p -> ags_mapped_mem_p = NULL;
 								}		/* if (storage_p -> ags_largest_entry_memory_id != -1) */
 							else
 								{
@@ -390,6 +391,12 @@ bool AddObjectToAPRGlobalStorage (APRGlobalStorage *storage_p, const void *raw_k
 				{
 					apr_time_t end_of_time = APR_INT64_MAX;
 
+					/*
+					 * The size actually held in the cache, which for compressed data
+					 * can be larger than value_length, is what retrieval needs.
+					 */
+					unsigned int stored_length = value_length;
+
 					/* store it */
 					if (storage_p -> ags_compress_fn)
 						{
@@ -407,6 +414,7 @@ bool AddObjectToAPRGlobalStorage (APRGlobalStorage *storage_p, const void *raw_k
 																								compressed_data_length,
 																								storage_p -> ags_pool_p);
 
+									stored_length = compressed_data_length;
 									FreeMemory (compressed_data_p);
 								}
 							else
@@ -432,9 +440,9 @@ bool AddObjectToAPRGlobalStorage (APRGlobalStorage *storage_p, const void *raw_k
 						{
 							success_flag = true;
 
-							if (!SetLargestEntrySize (storage_p, value_length))
+							if (!SetLargestEntrySize (storage_p, stored_length))
 								{
-									PrintErrors (STM_LEVEL_FINE, __FILE__, __LINE__, "Failed to possibly set largest entry size to %u", value_length);
+									PrintErrors (STM_LEVEL_FINE, __FILE__, __LINE__, "Failed to possibly set largest entry size to %u", stored_length);
 								}
 
 							#if APR_GLOBAL_STORAGE_DEBUG >= STM_LEVEL_FINE
@@ -451,14 +459,14 @@ bool AddObjectToAPRGlobalStorage (APRGlobalStorage *storage_p, const void *raw_k
 
 					if (status != APR_SUCCESS)
 						{
-							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to unlock mutex, status %s after adding %s", status, key_s);
+							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to unlock mutex, status %d after adding %s", status, key_s);
 						} /* if (status != APR_SUCCESS) */
 
 
 				}		/* if (status == APR_SUCCESS) */
 			else
 				{
-					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to lock mutex, status %s to add %s", status, key_s);
+					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to lock mutex, status %d to add %s", status, key_s);
 				}
 
 			if (alloc_key_flag)
@@ -633,14 +641,14 @@ static void *FindObjectFromAPRGlobalStorage (APRGlobalStorage *storage_p, const 
 										}
 									else
 										{
-											PrintErrors (STM_LEVEL_SEVERE,  __FILE__, __LINE__,"Failed to allocate temporary memory when looking up key \"%s\"", key_s);
+											PrintErrors (STM_LEVEL_SEVERE,  __FILE__, __LINE__,"Failed to retrieve value for key \"%s\", status %d", key_s, status);
 											FreeMemory (temp_p);
 										}
 
 								}		/* if (temp_p) */
 							else
 								{
-									PrintErrors (STM_LEVEL_SEVERE,  __FILE__, __LINE__,"status %d key %s result_p %0.16X remove_flag %d", status, key_s, temp_p, remove_flag);
+									PrintErrors (STM_LEVEL_SEVERE,  __FILE__, __LINE__,"Failed to allocate %u bytes of temporary memory when looking up key \"%s\"", array_size, key_s);
 									FreeMemory (temp_p);
 								}
 
@@ -650,19 +658,18 @@ static void *FindObjectFromAPRGlobalStorage (APRGlobalStorage *storage_p, const 
 							PrintErrors (STM_LEVEL_SEVERE,  __FILE__, __LINE__,"Failed to get largest entry size when adding \"%s\"", key_s);
 						}
 
+					status = apr_global_mutex_unlock (storage_p -> ags_mutex_p);
+
+					if (status != APR_SUCCESS)
+						{
+							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to unlock mutex for %s, status %d", key_s, status);
+						} /* if (status != APR_SUCCESS) */
+
 				}		/* if (status == APR_SUCCESS) */
 			else
 				{
-					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to lock mutex for %s, status %s", key_s, status);
+					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to lock mutex for %s, status %d", key_s, status);
 				}
-
-
-			status = apr_global_mutex_unlock (storage_p -> ags_mutex_p);
-
-			if (status != APR_SUCCESS)
-				{
-					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to unlock mutex for %s, status %s after finding %s", key_s, status);
-				} /* if (status != APR_SUCCESS) */
 
 			if (key_p != raw_key_p)
 				{

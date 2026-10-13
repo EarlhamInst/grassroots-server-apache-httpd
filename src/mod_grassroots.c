@@ -534,7 +534,7 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 						}
 					else
 						{
-							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_config_s from \"%s\" and \"%s\"", base_config_p -> glc_config_s ? base_config_p -> glc_config_s : "NULL", new_config_p -> glc_root_path_s ? new_config_p -> glc_config_s : "NULL");
+							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_config_s from \"%s\" and \"%s\"", base_config_p -> glc_config_s ? base_config_p -> glc_config_s : "NULL", new_config_p -> glc_config_s ? new_config_p -> glc_config_s : "NULL");
 						}
 				}
 			else
@@ -602,7 +602,7 @@ static void GrassrootsChildInit (apr_pool_t *pool_p, server_rec *server_p)
 						}
 					else
 						{
-							FreeOutputStream (log_p);
+							/* log_p is freed by the pool cleanup registered above */
 							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL , server_p, "AllocateApacheOutputStream for errors failed");
 						}
 				}
@@ -787,7 +787,7 @@ static const char *SetGrassrootsReferencesPath (cmd_parms *cmd_p, void *cfg_p, c
 {
 	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
 
-	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_services_config_path_s), arg_s, config_p);
+	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_references_path_s), arg_s, config_p);
 }
 
 
@@ -998,7 +998,7 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 			const char *email_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, email_key_s);
 			const char *name_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, name_key_s);
 			const char *org_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, org_key_s);
-			const char *forename_s = NULL;
+			char *forename_s = NULL;
 			const char *surname_s = NULL;
 
 			if (name_s)
@@ -1022,6 +1022,12 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 				}
 
 			user_p = AllocateUser (NULL, email_s, forename_s, surname_s, org_s, NULL);
+
+			/* AllocateUser takes its own copies */
+			if (forename_s)
+				{
+					FreeCopiedString (forename_s);
+				}
 
 			if (!user_p)
 				{
@@ -1144,7 +1150,11 @@ static int GrassrootsHandler (request_rec *req_p)
   					break;
 				}
 
-  		if (json_req_p && grassroots_uri_s)
+  		if (res == HTTP_METHOD_NOT_ALLOWED)
+  			{
+  				/* nothing to do */
+  			}
+  		else if (json_req_p && grassroots_uri_s)
   			{
 					if (grassroots_p)
 						{
@@ -1211,12 +1221,6 @@ static int GrassrootsHandler (request_rec *req_p)
 									res = HTTP_BAD_REQUEST;
 								}
 
-							#if MOD_GRASSROOTS_DEBUG >= STM_LEVEL_FINER
-							PrintLog (STM_LEVEL_FINER, __FILE__, __LINE__, "json_req_p -> refcount %ld", json_req_p -> refcount);
-							#endif
-							json_decref (json_req_p);
-
-
 							if (user_p)
 								{
 									FreeUser (user_p);
@@ -1224,9 +1228,19 @@ static int GrassrootsHandler (request_rec *req_p)
 
 						}		/* if (grassroots_p) */
 
+					#if MOD_GRASSROOTS_DEBUG >= STM_LEVEL_FINER
+					PrintLog (STM_LEVEL_FINER, __FILE__, __LINE__, "json_req_p -> refcount %ld", json_req_p -> refcount);
+					#endif
+					json_decref (json_req_p);
+
 				}		/* if (json_req_p) */
 			else
 				{
+					if (json_req_p)
+						{
+							json_decref (json_req_p);
+						}
+
 					ap_rprintf (req_p, "Error getting input data from request");
 					res = HTTP_BAD_REQUEST;
 				}
@@ -1296,7 +1310,7 @@ static GrassrootsServer *GetOrCreateNamedGrassrootsServer (const char * const lo
   					}		/* if (IsAPRServersManagerName (config_p -> glc_servers_manager_s)) */
 
   				grassroots_p = AllocateGrassrootsServer (config_p -> glc_root_path_s, config_p -> glc_config_s, config_p -> glc_services_config_path_s, config_p -> glc_services_path_s,
-  					config_p -> glc_references_path_s, config_p -> glc_jobs_managers_path_s, config_p -> glc_servers_path_s, jobs_manager_p, jobs_manager_mem, & (servers_manager_p -> asm_base_manager), servers_manager_mem);
+  					config_p -> glc_references_path_s, config_p -> glc_jobs_managers_path_s, config_p -> glc_servers_path_s, jobs_manager_p, jobs_manager_mem, servers_manager_p ? & (servers_manager_p -> asm_base_manager) : NULL, servers_manager_mem);
 
   				if (grassroots_p)
   					{

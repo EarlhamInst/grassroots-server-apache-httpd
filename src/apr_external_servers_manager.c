@@ -184,7 +184,8 @@ APRServersManager *ChildInitAPRServersManager (const char * const id_s, apr_pool
 					return manager_p;
 				}
 
-			DestroyAPRServersManager (& (manager_p -> asm_base_manager));
+			/* Run and unregister the pool cleanup so manager_p isn't freed twice */
+			apr_pool_cleanup_run (pool_p, manager_p, CleanUpAPRServersManager);
 		}
 
 	return NULL;

@@ -194,7 +194,7 @@ json_t *GetRequestParamsAsJSON (request_rec *req_p, char **grassroots_uri_ss)
 				}
 			else
 				{
-					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to copy first " SIZET_FMT " chars from \"%s\"", api_s - path_s, path_s);
+					PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to get root uri from \"%s\" and path \"%s\"", req_p -> uri, path_s);
 				}
 
 		}
@@ -344,7 +344,7 @@ static json_t *ConvertPostParametersToJSON (request_rec *req_p)
 								}
 							else
 								{
-									json_t *root_p = json_object ();
+									root_p = json_object ();
 
 									if (root_p)
 										{
@@ -364,7 +364,7 @@ static json_t *ConvertPostParametersToJSON (request_rec *req_p)
 				}
 			else
 				{
-					json_t *root_p = json_object ();
+					root_p = json_object ();
 
 					if (root_p)
 						{
@@ -594,6 +594,8 @@ int ReadBody (request_rec *req_p, ByteBuffer *buffer_p)
 								{
 									ret = HTTP_INTERNAL_SERVER_ERROR;
 								}
+
+							rpos += rsize;
 						}
 				}
 		}
@@ -640,14 +642,14 @@ static json_t *GetServiceRequestFromURI (const char *service_name_s, apr_table_t
 																						{
 																							if (json_object_set_new (root_p, SERVICES_NAME_S, array_p) == 0)
 																								{
+																									/* json_array_append_new () decrefs service_req_p on failure */
 																									if (json_array_append_new (array_p, service_req_p) == 0)
 																										{
 																											return root_p;
 																										}
-																								}
-																							else
-																								{
-																									json_decref (array_p);
+
+																									json_decref (root_p);
+																									return NULL;
 																								}
 																						}
 
@@ -655,15 +657,7 @@ static json_t *GetServiceRequestFromURI (const char *service_name_s, apr_table_t
 																				}
 																		}
 																}
-															else
-																{
-																	json_decref (params_json_p);
-																}
 														}
-												}
-											else
-												{
-													json_decref (parameter_set_json_p);
 												}
 										}
 
@@ -714,23 +708,12 @@ static json_t *GetOperationRequestFromURI (const char *operation_s, apr_table_t 
 												{
 													if (json_array_append_new (service_names_p, service_name_json_p) == 0)
 														{
+															/* GetServicesRequest takes its own reference to service_names_p */
 															json_req_p = GetServicesRequest (NULL, op, SERVICES_NAME_S, service_names_p, sv_p);
-
-															if (json_req_p)
-																{
-
-																}
-														}
-													else
-														{
-															json_decref (service_name_json_p);
 														}
 												}
 
-											if (!json_req_p)
-												{
-													json_decref (service_names_p);
-												}
+											json_decref (service_names_p);
 										}
 
 
