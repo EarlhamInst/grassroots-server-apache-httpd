@@ -161,6 +161,9 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 
 static const char *GetClaimHeaderValue (request_rec *req_p, const char * const claim_prefix_s, const char * const claim_key_s);
 
+static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool add_src, bool *dest_p);
+
+
 
 static const command_rec s_grassroots_directives [] =
 {
@@ -343,6 +346,7 @@ static GrassrootsLocationConfig *CreateConfig (apr_pool_t *pool_p, server_rec *s
 							config_p -> glc_user_auth_org_key_s = NULL;
 							config_p -> glc_servers_p = servers_p;
 							config_p -> glc_server_p = server_p;
+							config_p -> glc_add_users_to_db = false;
 						}
 				}
 		}
@@ -376,6 +380,16 @@ static bool CopyStringValue (apr_pool_t *pool_p, const char *base_src_s, const c
 
 	return success_flag;
 }
+
+
+static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool add_src, bool *dest_p)
+{
+	*dest_p = add_src ? add_src : base_src;
+
+	return true;
+}
+
+
 
 
 static void *MergeDirectoryConfig (apr_pool_t *pool_p, void *base_p, void *new_p)
@@ -418,37 +432,44 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 																		{
 																			if (CopyStringValue (pool_p, base_config_p -> glc_references_path_s, new_config_p -> glc_references_path_s, & (merged_config_p -> glc_references_path_s)))
 																				{
-
 																					if (CopyStringValue (pool_p, base_config_p -> glc_jobs_managers_path_s, new_config_p -> glc_jobs_managers_path_s, & (merged_config_p -> glc_jobs_managers_path_s)))
 																						{
 																							if (CopyStringValue (pool_p, base_config_p -> glc_servers_path_s, new_config_p -> glc_servers_path_s, & (merged_config_p -> glc_servers_path_s)))
 																								{
 																									if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_system_s, new_config_p -> glc_user_auth_system_s, & (merged_config_p -> glc_user_auth_system_s)))
 																										{
-
 																											if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_claim_s, new_config_p -> glc_user_auth_claim_s, & (merged_config_p -> glc_user_auth_claim_s)))
 																												{
-
-
 																													if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_email_key_s, new_config_p -> glc_user_auth_email_key_s, & (merged_config_p -> glc_user_auth_email_key_s)))
 																														{
 																															if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_name_key_s, new_config_p -> glc_user_auth_name_key_s, & (merged_config_p -> glc_user_auth_name_key_s)))
 																																{
 																																	if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_org_key_s, new_config_p -> glc_user_auth_org_key_s, & (merged_config_p -> glc_user_auth_org_key_s)))
 																																		{
-																																			apr_hash_t *merged_servers_p = apr_hash_overlay (pool_p, new_config_p -> glc_servers_p, base_config_p -> glc_servers_p);
-
-																																			if (merged_servers_p)
+																																			if (CopyBoolValue (pool_p, base_config_p -> glc_add_users_to_db, new_config_p -> glc_add_users_to_db, & (merged_config_p -> glc_add_users_to_db)))
 																																				{
-																																					merged_config_p -> glc_servers_p = merged_servers_p;
-																																					merged_config_p -> glc_server_p = new_config_p -> glc_server_p ? new_config_p -> glc_server_p : base_config_p -> glc_server_p;
+																																					apr_hash_t *merged_servers_p = apr_hash_overlay (pool_p, new_config_p -> glc_servers_p, base_config_p -> glc_servers_p);
 
-																																					return merged_config_p;
-																																				}
+																																					if (merged_servers_p)
+																																						{
+																																							merged_config_p -> glc_servers_p = merged_servers_p;
+																																							merged_config_p -> glc_server_p = new_config_p -> glc_server_p ? new_config_p -> glc_server_p : base_config_p -> glc_server_p;
+
+																																							return merged_config_p;
+																																						}
+																																					else
+																																						{
+																																							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to create merged grassroots servers hash table");
+																																						}
+
+																																				}		/* if (CopyBoolValue (pool_p, base_config_p -> glc_add_users_to_db, new_config_p -> glc_add_users_to_db, & (merged_config_p -> glc_add_users_to_db))) */
 																																			else
 																																				{
-																																					ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to create merged grassroots servers hash table");
+																																					ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_add_users_to_db from \"%s\" and \"%s\"",
+																																												base_config_p -> glc_add_users_to_db ? "true" : "false",
+																																												new_config_p -> glc_add_users_to_db ? "true" : "false");
 																																				}
+
 
 																																		}		/* if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_org_key_s, new_config_p -> glc_user_auth_org_key_s, & (merged_config_p -> glc_user_auth_org_key_s))) */
 																																	else
@@ -1045,7 +1066,7 @@ static User *GetUserFromBasicAuth (request_rec *req_p, GrassrootsLocationConfig 
 			/** see if it is a username or an email */
 			if (strchr (req_p -> user, '@'))
 				{
-					user_p = GetUserByEmailAddress (grassroots_p, req_p -> user);
+					user_p = GetExistingUserByEmailAddress (grassroots_p, req_p -> user);
 
 					if (!user_p)
 						{
@@ -1173,6 +1194,35 @@ static int GrassrootsHandler (request_rec *req_p)
 										}
 
 								}
+
+
+							/*
+							 * If the user has logged in, let's add them to the users database
+							 */
+							if ((config_p -> glc_add_users_to_db) && (user_p != NULL) && (user_p -> us_email_s != NULL))
+								{
+									User *existing_user_p = GetExistingUserByEmailAddress (grassroots_p, user_p -> us_email_s);
+
+									if (existing_user_p)
+										{
+											FreeUser (existing_user_p);
+										}
+									else
+										{
+											/*
+											 *  Add the user to the system
+											 */
+											OperationStatus status = SaveUserOnServer (grassroots_p, user_p);
+
+											if (status != OS_SUCCEEDED)
+												{
+													PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to add user \"%s\" to the system", user_p -> us_email_s);
+
+												}
+										}
+
+								}		/* if ((config_p -> glc_add_users_to_db) && (user_p != NULL) && (user_p -> us_email_s != NULL)) */
+
 
 							res_p = ProcessServerJSONMessage (grassroots_p, json_req_p, user_p, &error_s);
 

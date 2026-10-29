@@ -190,6 +190,8 @@ typedef struct
 	char *glc_user_auth_org_key_s;
 
 
+	bool glc_add_users_to_db;
+
 } GrassrootsLocationConfig;
 
 
