@@ -869,7 +869,7 @@ static const char *SetGrassrootsAddUsers (cmd_parms *cmd_p, void *cfg_p, const c
 		}
 	else
 		{
-			error_s = "Invalid setting for AddUsers";
+			error_s = "Invalid setting for GrassrootsAddAuthenticatedUsers";
 		}
 
 	return error_s;
