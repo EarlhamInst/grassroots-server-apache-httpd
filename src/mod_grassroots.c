@@ -343,6 +343,7 @@ static GrassrootsLocationConfig *CreateConfig (apr_pool_t *pool_p, server_rec *s
 							config_p -> glc_user_auth_org_key_s = NULL;
 							config_p -> glc_servers_p = servers_p;
 							config_p -> glc_server_p = server_p;
+							config_p -> glc_add_user_flag = false;
 						}
 				}
 		}
@@ -376,6 +377,7 @@ static bool CopyStringValue (apr_pool_t *pool_p, const char *base_src_s, const c
 
 	return success_flag;
 }
+
 
 
 static void *MergeDirectoryConfig (apr_pool_t *pool_p, void *base_p, void *new_p)
@@ -1051,7 +1053,7 @@ static User *GetUserFromBasicAuth (request_rec *req_p, GrassrootsLocationConfig 
 			/** see if it is a username or an email */
 			if (strchr (req_p -> user, '@'))
 				{
-					user_p = GetUserByEmailAddress (grassroots_p, req_p -> user);
+					user_p = GetExistingUserByEmailAddress (grassroots_p, req_p -> user);
 
 					if (!user_p)
 						{
@@ -1183,6 +1185,12 @@ static int GrassrootsHandler (request_rec *req_p)
 										}
 
 								}
+
+
+							if (user_p)
+								{
+
+								}		/* if (user_p) */
 
 							res_p = ProcessServerJSONMessage (grassroots_p, json_req_p, user_p, &error_s);
 
