@@ -1089,22 +1089,23 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 
 static User *GetUserFromBasicAuth (request_rec *req_p, GrassrootsLocationConfig *config_p, GrassrootsServer *grassroots_p)
 {
-	User *user_p = NULL;
-
 	if (req_p -> user)
 		{
 			PrintLog (STM_LEVEL_FINE, __FILE__, __LINE__, "request from user \"%s\"\n", req_p -> user);
 
-			/** see if it is a username or an email */
+			/* see if it is a username or an email */
 			if (strchr (req_p -> user, '@'))
 				{
-					user_p = GetExistingUserByEmailAddress (grassroots_p, req_p -> user);
+					User *user_p = AllocateUser (NULL, req_p -> user, NULL, NULL, NULL, NULL);
 
-					if (!user_p)
+					if (user_p)
 						{
-		  				PrintErrors (STM_LEVEL_FINE, __FILE__, __LINE__, "Failed to allocate user: email \"%s\"", req_p -> user);
+							return user_p;
 						}
-
+					else
+						{
+							PrintErrors (STM_LEVEL_FINE, __FILE__, __LINE__, "Failed to allocate user: email \"%s\"", req_p -> user);
+						}
 				}
 			else
 				{
@@ -1113,7 +1114,7 @@ static User *GetUserFromBasicAuth (request_rec *req_p, GrassrootsLocationConfig 
 		}
 
 
-	return user_p;
+	return NULL;
 }
 
 
@@ -1241,7 +1242,12 @@ static int GrassrootsHandler (request_rec *req_p)
 
 									if (existing_user_p)
 										{
-											FreeUser (existing_user_p);
+											/* switch to the existing user to grab their _id too */
+											User *temp_p = user_p;
+
+											user_p = existing_user_p;
+
+											FreeUser (temp_p);
 										}
 									else
 										{
