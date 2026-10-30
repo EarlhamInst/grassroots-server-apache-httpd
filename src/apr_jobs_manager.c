@@ -192,7 +192,8 @@ APRJobsManager *APRJobsManagerChildInit (apr_pool_t *pool_p, server_rec *server_
 					return manager_p;
 				}
 
-			DestroyAPRJobsManager (manager_p);
+			/* Run and unregister the pool cleanup so manager_p isn't freed twice */
+			apr_pool_cleanup_run (pool_p, manager_p, CleanUpAPRJobsManager);
 		}
 
 	return NULL;
@@ -272,6 +273,7 @@ static bool AddServiceJobToAPRJobsManager (JobsManager *jobs_manager_p, uuid_t j
 							PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "json_dumps failed for \"%s\"", uuid_s);
 						}
 
+					json_decref (job_json_p);
 				}		/* if (job_json_p) */
 
 		}		/* if (service_p) */
@@ -446,12 +448,13 @@ static apr_status_t AddServiceJobFromSOCache (ap_socache_instance_t *instance_p,
 				}
 			else
 				{
+					FreeServiceJob (job_p);
 					status = APR_ENOMEM;
 				}
 		}
 	else
 		{
-			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create external server from \"%s\"", (char *) data_p);
+			PrintErrors (STM_LEVEL_SEVERE, __FILE__, __LINE__, "Failed to create service job from \"%s\"", (char *) data_p);
 		}
 
 	return status;

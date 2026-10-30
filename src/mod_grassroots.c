@@ -102,6 +102,8 @@ static const char *SetGrassrootsUserAuthEmailKey (cmd_parms *cmd_p, void *cfg_p,
 static const char *SetGrassrootsUserAuthNameKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
 static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
 
+static const char *SetGrassrootsAddUsers (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
+
 
 static void *CreateServerConfig (apr_pool_t *pool_p, server_rec *server_p);
 
@@ -182,6 +184,7 @@ static const command_rec s_grassroots_directives [] =
 	AP_INIT_TAKE1 ("GrassrootsUserEmailKey", SetGrassrootsUserAuthEmailKey, NULL, ACCESS_CONF, "Set the user claim email key suffix for querying the user details"),
 	AP_INIT_TAKE1 ("GrassrootsUserNameKey", SetGrassrootsUserAuthNameKey, NULL, ACCESS_CONF, "Set the user claim name key suffix for querying the user details"),
 	AP_INIT_TAKE1 ("GrassrootsUserOrgKey", SetGrassrootsUserAuthOrgKey, NULL, ACCESS_CONF, "Set the user claim organization key suffix for querying the user details"),
+	AP_INIT_TAKE1 ("GrassrootsAddAuthenticatedUsers", SetGrassrootsAddUsers, NULL, ACCESS_CONF, "Automatically add authenticated users to the system"),
 
 	{ NULL }
 };
@@ -346,7 +349,7 @@ static GrassrootsLocationConfig *CreateConfig (apr_pool_t *pool_p, server_rec *s
 							config_p -> glc_user_auth_org_key_s = NULL;
 							config_p -> glc_servers_p = servers_p;
 							config_p -> glc_server_p = server_p;
-							config_p -> glc_add_users_to_db = false;
+							config_p -> glc_add_users_to_db_flag = false;
 						}
 				}
 		}
@@ -382,6 +385,7 @@ static bool CopyStringValue (apr_pool_t *pool_p, const char *base_src_s, const c
 }
 
 
+<<<<<<< HEAD
 static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool add_src, bool *dest_p)
 {
 	*dest_p = add_src ? add_src : base_src;
@@ -391,6 +395,8 @@ static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool a
 
 
 
+=======
+>>>>>>> fix-memory-and-config-bugs
 
 static void *MergeDirectoryConfig (apr_pool_t *pool_p, void *base_p, void *new_p)
 {
@@ -446,7 +452,7 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 																																{
 																																	if (CopyStringValue (pool_p, base_config_p -> glc_user_auth_org_key_s, new_config_p -> glc_user_auth_org_key_s, & (merged_config_p -> glc_user_auth_org_key_s)))
 																																		{
-																																			if (CopyBoolValue (pool_p, base_config_p -> glc_add_users_to_db, new_config_p -> glc_add_users_to_db, & (merged_config_p -> glc_add_users_to_db)))
+																																			if (CopyBoolValue (pool_p, base_config_p -> glc_add_users_to_db_flag, new_config_p -> glc_add_users_to_db_flag, & (merged_config_p -> glc_add_users_to_db_flag)))
 																																				{
 																																					apr_hash_t *merged_servers_p = apr_hash_overlay (pool_p, new_config_p -> glc_servers_p, base_config_p -> glc_servers_p);
 
@@ -466,8 +472,8 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 																																			else
 																																				{
 																																					ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_add_users_to_db from \"%s\" and \"%s\"",
-																																												base_config_p -> glc_add_users_to_db ? "true" : "false",
-																																												new_config_p -> glc_add_users_to_db ? "true" : "false");
+																																												base_config_p -> glc_add_users_to_db_flag ? "true" : "false",
+																																												new_config_p -> glc_add_users_to_db_flag ? "true" : "false");
 																																				}
 
 
@@ -555,7 +561,7 @@ static void *MergeConfigs (apr_pool_t *pool_p, void *base_p, void *new_p)
 						}
 					else
 						{
-							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_config_s from \"%s\" and \"%s\"", base_config_p -> glc_config_s ? base_config_p -> glc_config_s : "NULL", new_config_p -> glc_root_path_s ? new_config_p -> glc_config_s : "NULL");
+							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL, NULL, "failed to set merged config glc_config_s from \"%s\" and \"%s\"", base_config_p -> glc_config_s ? base_config_p -> glc_config_s : "NULL", new_config_p -> glc_config_s ? new_config_p -> glc_config_s : "NULL");
 						}
 				}
 			else
@@ -623,7 +629,7 @@ static void GrassrootsChildInit (apr_pool_t *pool_p, server_rec *server_p)
 						}
 					else
 						{
-							FreeOutputStream (log_p);
+							/* log_p is freed by the pool cleanup registered above */
 							ap_log_error (APLOG_MARK, APLOG_CRIT, APR_EGENERAL , server_p, "AllocateApacheOutputStream for errors failed");
 						}
 				}
@@ -808,7 +814,7 @@ static const char *SetGrassrootsReferencesPath (cmd_parms *cmd_p, void *cfg_p, c
 {
 	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
 
-	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_services_config_path_s), arg_s, config_p);
+	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_references_path_s), arg_s, config_p);
 }
 
 
@@ -868,6 +874,30 @@ static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, c
 
 	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_user_auth_org_key_s), arg_s, config_p);
 }
+
+
+static const char *SetGrassrootsAddUsers (cmd_parms *cmd_p, void *cfg_p, const char *arg_s)
+{
+	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
+	const char *error_s = NULL;
+
+	if (Stricmp (arg_s, "true") == 0)
+		{
+			config_p -> glc_add_users_to_db_flag = true;
+		}
+	else if (Stricmp (arg_s, "false") == 0)
+		{
+			config_p -> glc_add_users_to_db_flag = false;
+		}
+	else
+		{
+			error_s = "Invalid setting for GrassrootsAddAuthenticatedUsers";
+		}
+
+	return error_s;
+}
+
+
 
 
 static apr_status_t CleanUpTasks (void *value_p)
@@ -1019,7 +1049,7 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 			const char *email_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, email_key_s);
 			const char *name_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, name_key_s);
 			const char *org_s = GetClaimHeaderValue (req_p, config_p -> glc_user_auth_claim_s, org_key_s);
-			const char *forename_s = NULL;
+			char *forename_s = NULL;
 			const char *surname_s = NULL;
 
 			if (name_s)
@@ -1043,6 +1073,12 @@ static User *GetUserFromOIDC (request_rec *req_p, GrassrootsLocationConfig *conf
 				}
 
 			user_p = AllocateUser (NULL, email_s, forename_s, surname_s, org_s, NULL);
+
+			/* AllocateUser takes its own copies */
+			if (forename_s)
+				{
+					FreeCopiedString (forename_s);
+				}
 
 			if (!user_p)
 				{
@@ -1165,7 +1201,11 @@ static int GrassrootsHandler (request_rec *req_p)
   					break;
 				}
 
-  		if (json_req_p && grassroots_uri_s)
+  		if (res == HTTP_METHOD_NOT_ALLOWED)
+  			{
+  				/* nothing to do */
+  			}
+  		else if (json_req_p && grassroots_uri_s)
   			{
 					if (grassroots_p)
 						{
@@ -1199,7 +1239,7 @@ static int GrassrootsHandler (request_rec *req_p)
 							/*
 							 * If the user has logged in, let's add them to the users database
 							 */
-							if ((config_p -> glc_add_users_to_db) && (user_p != NULL) && (user_p -> us_email_s != NULL))
+							if ((config_p -> glc_add_users_to_db_flag) && (user_p != NULL) && (user_p -> us_email_s != NULL))
 								{
 									User *existing_user_p = GetExistingUserByEmailAddress (grassroots_p, user_p -> us_email_s);
 
@@ -1261,12 +1301,6 @@ static int GrassrootsHandler (request_rec *req_p)
 									res = HTTP_BAD_REQUEST;
 								}
 
-							#if MOD_GRASSROOTS_DEBUG >= STM_LEVEL_FINER
-							PrintLog (STM_LEVEL_FINER, __FILE__, __LINE__, "json_req_p -> refcount %ld", json_req_p -> refcount);
-							#endif
-							json_decref (json_req_p);
-
-
 							if (user_p)
 								{
 									FreeUser (user_p);
@@ -1274,9 +1308,19 @@ static int GrassrootsHandler (request_rec *req_p)
 
 						}		/* if (grassroots_p) */
 
+					#if MOD_GRASSROOTS_DEBUG >= STM_LEVEL_FINER
+					PrintLog (STM_LEVEL_FINER, __FILE__, __LINE__, "json_req_p -> refcount %ld", json_req_p -> refcount);
+					#endif
+					json_decref (json_req_p);
+
 				}		/* if (json_req_p) */
 			else
 				{
+					if (json_req_p)
+						{
+							json_decref (json_req_p);
+						}
+
 					ap_rprintf (req_p, "Error getting input data from request");
 					res = HTTP_BAD_REQUEST;
 				}
@@ -1346,7 +1390,7 @@ static GrassrootsServer *GetOrCreateNamedGrassrootsServer (const char * const lo
   					}		/* if (IsAPRServersManagerName (config_p -> glc_servers_manager_s)) */
 
   				grassroots_p = AllocateGrassrootsServer (config_p -> glc_root_path_s, config_p -> glc_config_s, config_p -> glc_services_config_path_s, config_p -> glc_services_path_s,
-  					config_p -> glc_references_path_s, config_p -> glc_jobs_managers_path_s, config_p -> glc_servers_path_s, jobs_manager_p, jobs_manager_mem, & (servers_manager_p -> asm_base_manager), servers_manager_mem);
+  					config_p -> glc_references_path_s, config_p -> glc_jobs_managers_path_s, config_p -> glc_servers_path_s, jobs_manager_p, jobs_manager_mem, servers_manager_p ? & (servers_manager_p -> asm_base_manager) : NULL, servers_manager_mem);
 
   				if (grassroots_p)
   					{
