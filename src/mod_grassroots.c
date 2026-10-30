@@ -102,6 +102,8 @@ static const char *SetGrassrootsUserAuthEmailKey (cmd_parms *cmd_p, void *cfg_p,
 static const char *SetGrassrootsUserAuthNameKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
 static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
 
+static const char *SetGrassrootsAddUsers (cmd_parms *cmd_p, void *cfg_p, const char *arg_s);
+
 
 static void *CreateServerConfig (apr_pool_t *pool_p, server_rec *server_p);
 
@@ -179,6 +181,7 @@ static const command_rec s_grassroots_directives [] =
 	AP_INIT_TAKE1 ("GrassrootsUserEmailKey", SetGrassrootsUserAuthEmailKey, NULL, ACCESS_CONF, "Set the user claim email key suffix for querying the user details"),
 	AP_INIT_TAKE1 ("GrassrootsUserNameKey", SetGrassrootsUserAuthNameKey, NULL, ACCESS_CONF, "Set the user claim name key suffix for querying the user details"),
 	AP_INIT_TAKE1 ("GrassrootsUserOrgKey", SetGrassrootsUserAuthOrgKey, NULL, ACCESS_CONF, "Set the user claim organization key suffix for querying the user details"),
+	AP_INIT_TAKE1 ("GrassrootsAddAuthenticatedUsers", SetGrassrootsAddUsers, NULL, ACCESS_CONF, "Automatically add authenticated users to the system"),
 
 	{ NULL }
 };
@@ -849,6 +852,30 @@ static const char *SetGrassrootsUserAuthOrgKey (cmd_parms *cmd_p, void *cfg_p, c
 
 	return SetGrassrootsConfigString (cmd_p, & (config_p -> glc_user_auth_org_key_s), arg_s, config_p);
 }
+
+
+static const char *SetGrassrootsAddUsers (cmd_parms *cmd_p, void *cfg_p, const char *arg_s)
+{
+	GrassrootsLocationConfig *config_p = (GrassrootsLocationConfig *) cfg_p;
+	const char *error_s = NULL;
+
+	if (Stricmp (arg_s, "true") == 0)
+		{
+			config_p -> glc_add_user_flag = true;
+		}
+	else if (Stricmp (arg_s, "false") == 0)
+		{
+			config_p -> glc_add_user_flag = false;
+		}
+	else
+		{
+			error_s = "Invalid setting for AddUsers";
+		}
+
+	return error_s;
+}
+
+
 
 
 static apr_status_t CleanUpTasks (void *value_p)
