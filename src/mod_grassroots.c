@@ -385,7 +385,6 @@ static bool CopyStringValue (apr_pool_t *pool_p, const char *base_src_s, const c
 }
 
 
-<<<<<<< HEAD
 static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool add_src, bool *dest_p)
 {
 	*dest_p = add_src ? add_src : base_src;
@@ -394,9 +393,6 @@ static bool CopyBoolValue (apr_pool_t *pool_p, const bool base_src, const bool a
 }
 
 
-
-=======
->>>>>>> fix-memory-and-config-bugs
 
 static void *MergeDirectoryConfig (apr_pool_t *pool_p, void *base_p, void *new_p)
 {
